@@ -1,1 +1,6 @@
 @openzeppelin/=lib/openzeppelin-contracts/
+forge-std/=lib/forge-std/src/
+kontrol-cheatcodes/=lib/kontrol-cheatcodes/src/
+contracts/=./contracts/
+test/=./test/
+scripts/=./scripts/
