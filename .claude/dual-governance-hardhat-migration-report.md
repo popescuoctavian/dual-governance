@@ -1,7 +1,7 @@
 # Dual Governance — Hardhat 3 Migration Report
 
-**Hardhat version installed:** `^3.2.0`
-**Migration date:** 2026-03-24
+**Hardhat version installed:** `^3.3.0`
+**Migration date:** 2026-04-06
 **Foundry analysis:** [Foundry analysis](dual-governance-foundry-migration-analysis.md)
 
 ---
@@ -13,23 +13,23 @@
 All 864 non-fork unit tests pass. Fork tests pass individually but hit Alchemy free-tier rate limits when run concurrently. One regression test (`ResealManagerRegressionTest`) fails due to missing on-chain permissions — not a migration issue.
 
 ### Gaps
-- 🚩 `forge script` has no Hardhat equivalent — deployment scripts in `scripts/` cannot be run
 
-### Remaining gaps (non-blocking)
+- 🚩 `Deployment scripting` — all scripts in `scripts/` unusable via Hardhat; no equivalent for `forge script`
 
-- 🚩 No test exclusion pattern (`no-match-path`) — Kontrol tests moved to another folder; would need exclusion mechanism if kept in the same folder structure
-- 🟡 Inline forge-config: allow_internal_expect_revert is enabled for all tests to be able to successfully run tests that have it as inline-config
+### Notable gaps (non-blocking, medium+ impact)
+
+- 🚩 `Test path filtering` — Kontrol tests moved to `kontrol-tests/` as workaround; would need `no-match-path` equivalent if kept under `test/`
 
 ### Other issues not related to migration
 
-- 🚩 Fork tests hit RPC rate limits when run all at once — run in batches or use a higher-tier RPC
-- 🚩 `ResealManagerRegressionTest#testFork_Reseal_HappyPath()` fails — ResealManager missing `PAUSE_ROLE`/`RESUME_ROLE` on sealable contracts on mainnet; passes with `GRANT_REQUIRED_PERMISSIONS=true`; same behavior in Forge
+- Fork tests require `MAINNET_RPC_URL` to be set; hit RPC rate limits when run concurrently — run in batches or use a higher-tier RPC
+- `ResealManagerRegressionTest#testFork_Reseal_HappyPath()` fails — ResealManager missing `PAUSE_ROLE`/`RESUME_ROLE` on mainnet sealable contracts; passes with `GRANT_REQUIRED_PERMISSIONS=true`; same behavior in Forge
 
 ## 1. Test Count Comparison
 
 | Metric | Count |
 |--------|-------|
-| `function test*` declarations (excluding `test/kontrol/`) | 921 |
+| `function test*` declarations (excluding `kontrol-tests/`) | 921 |
 | Hardhat tests passing | 864 |
 | Hardhat tests failing | 23 |
 | Hardhat tests pending/skipped | 3 |
@@ -57,13 +57,11 @@ Note: Some test contracts' `setUp()` fails (due to RPC rate limits), preventing 
 
 | Feature | Parity | Impact | Workaround / Notes |
 |---------|--------|--------|--------------------|
-| Test exclusion patterns (`no-match-path`) | 🚩 **Gap** | **Medium** — Kontrol tests moved to `kontrol-tests/` on this branch; would need exclusion if kept under `test/` | No tracking issue found — consider filing one. Workaround: move Kontrol tests outside `test/` directory |
-| `forge script` (deployment scripts) | 🚩 **Gap** | **High** — all scripts in `scripts/` unusable via Hardhat | No Hardhat equivalent. See: https://hardhat.org/docs — Hardhat Ignition is the deployment framework but requires rewriting scripts |
-| Gas snapshots (`forge snapshot`) | 🚩 **Gap** | **Medium** — no snapshot workflow available | [#7769](https://github.com/NomicFoundation/hardhat/issues/7769) — no workaround currently |
-| `memory_limit` (16 GB) | 🚩 **Gap** | **Low** — no Hardhat equivalent for per-test memory limits | No tracking issue found |
-| `ignored_warnings_from` | 🚩 **Gap** | **Low** — Kontrol test warnings cannot be suppressed | No tracking issue found |
-| Etherscan verification | 🟡 **Partial** | **Low** — Hardhat uses Etherscan API v2 (single key for all chains); Foundry allows per-chain keys. This project already uses a single key. | Consolidate to single `ETHERSCAN_API_KEY` — already the case here |
-| Inline test config (`forge-config:`) | 🟡 **Partial** | **Low** — not used by this project but worth noting | [#7355](https://github.com/NomicFoundation/hardhat/issues/7355) |
+| `Deployment scripting` | 🚩 **Gap** | **High** — all scripts in `scripts/` unusable via Hardhat | No Hardhat equivalent for `forge script`. Hardhat Ignition is the deployment framework but requires rewriting scripts |
+| `Test path filtering` | 🚩 **Gap** | **Medium** — Kontrol tests moved to `kontrol-tests/` on this branch; would need exclusion if kept under `test/` | No tracking issue found — consider filing one. Workaround: move tests outside `test/` directory |
+| `Compiler warning suppression` | 🚩 **Gap** | **Low** — Kontrol test warnings cannot be suppressed via `ignored_warnings_from` | No tracking issue found |
+| `Memory limit` | 🚩 **Gap** | **Low** — no Hardhat equivalent for `memory_limit` (16 GB) | No tracking issue found |
+| Etherscan verification | 🟡 **Partial** | **Low** — Hardhat uses Etherscan API v2 (single key for all chains); Foundry allows per-chain keys with custom URLs. This project already uses a single key. | Consolidate to single `ETHERSCAN_API_KEY` — already the case here |
 
 ### Full parity
 
@@ -73,15 +71,17 @@ These features work equivalently in Hardhat 3:
 - forge-std cheatcodes (`vm.*`) — all standard cheatcodes work correctly
 - Fuzz testing — runs with default 256 runs
 - EVM version `cancun` — supported
-- Optimizer settings — enabled with 200 runs
+- Optimizer settings — enabled with 200 runs (Forge default, explicitly set)
 - `fs_permissions` — mapped to `fsPermissions` config
 - `gas_limit` — mapped to `gasLimit` bigint
 - Coverage (`forge coverage` → `npx hardhat test solidity --coverage`) — built-in support
+- Gas snapshots (`--snapshot` / `--snapshot-check`) — supported since Hardhat 3.3.0
 - Remappings (`remappings.txt`) — natively loaded
 - Submodule dependencies (`lib/`) — resolved via remappings
 
 **Features not used by this project:**
 
+- Inline test config (`forge-config:`) — no inline directives found in codebase
 - Invariant testing — no `invariant_*` test functions found
 - `via_ir` compilation — not enabled
 - Multiple compiler versions — all files use 0.8.26
@@ -110,9 +110,13 @@ This is **not a migration issue** — the same failure occurs in Forge against t
 
 Renamed `testForwardCall()` → `forwardCall()` and `testVotingCall()` → `votingCall()` in the `TestOmnibus` harness contract to prevent Hardhat from detecting it as a test contract. Updated call sites in `OmnibusBaseTest` accordingly.
 
+**Root cause:** Hardhat identifies test contracts by looking for `test`-prefixed functions. The `TestOmnibus` harness had helper functions with the `test` prefix that were not actual tests.
+
 ### Kontrol tests moved
 
 The `test/kontrol/` directory was moved to `kontrol-tests/` on this branch. These tests use Kontrol-specific cheatcodes unsupported by Hardhat and were excluded in Forge via `no-match-path = 'test/kontrol/*'`.
+
+**Root cause:** Hardhat has no `no-match-path` equivalent for excluding test directories. Forge supports glob-based path exclusion; Hardhat does not.
 
 ### Remappings for absolute imports
 
