@@ -23,7 +23,7 @@ contract TestOmnibus is OmnibusBase {
         return voteItems;
     }
 
-    function testForwardCall(
+    function forwardCall(
         address forwarder,
         address target,
         bytes calldata data
@@ -31,7 +31,7 @@ contract TestOmnibus is OmnibusBase {
         return _forwardCall(forwarder, target, data);
     }
 
-    function testVotingCall(address target, bytes calldata data) external pure returns (ScriptCall memory) {
+    function votingCall(address target, bytes calldata data) external pure returns (ScriptCall memory) {
         return _votingCall(target, data);
     }
 }
@@ -175,7 +175,7 @@ contract OmnibusBaseTest is Test {
 
     function test_votingCall_HappyPath() external view {
         bytes memory callData = abi.encodeWithSignature("someFunction(uint256)", 123);
-        OmnibusBase.ScriptCall memory call = omnibusBase.testVotingCall(TARGET_ADDRESS_MOCK_1, callData);
+        OmnibusBase.ScriptCall memory call = omnibusBase.votingCall(TARGET_ADDRESS_MOCK_1, callData);
 
         assertEq(call.to, TARGET_ADDRESS_MOCK_1);
         assertEq(call.data, callData);
@@ -184,7 +184,7 @@ contract OmnibusBaseTest is Test {
     function test_forwardCall_HappyPath() external view {
         bytes memory callData = abi.encodeWithSignature("someFunction(uint256)", 123);
         OmnibusBase.ScriptCall memory call =
-            omnibusBase.testForwardCall(FORWARDER_MOCK, TARGET_ADDRESS_MOCK_2, callData);
+            omnibusBase.forwardCall(FORWARDER_MOCK, TARGET_ADDRESS_MOCK_2, callData);
 
         assertEq(call.to, FORWARDER_MOCK);
         bytes memory encodedScript = CallsScriptBuilder.create(TARGET_ADDRESS_MOCK_2, callData).getResult();
